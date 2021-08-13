@@ -1,0 +1,155 @@
+=======================================================================================================
+					Тесты на Postman
+=======================================================================================================
+
+//Приходящий токен необходимо передать во все остальные запросы.
+
+let jsonData = JSON.parse(responseBody);
+postman.setEnvironmentVariable("token", jsonData.token);
+
+=======================================================================================================
+
+//Статус код 200
+
+pm.test("1 Status code is 200", function () {
+    pm.response.to.have.status(200);
+});
+
+=======================================================================================================
+
+const jsonData = pm.response.json();
+
+=======================================================================================================
+
+// Проверка структуры json в ответе
+let schema = {
+"type": "object",
+"required": ["person", "qa_salary_after_12_months", "qa_salary_after_6_months", "start_qa_salary"],
+"properties":{
+    "person":{
+        "type": "object",
+        "required": ["u_age", "u_name", "u_salary_1_5_year"],
+        "properties": {
+            "u_age": {"type": "integer"},
+            "u_name": {"type": "array"},
+            "u_salary_1_5_year": {"type": "integer"}
+        }
+    },
+    "qa_salary_after_12_months": {"type": "integer"},
+    "qa_salary_after_6_months": {"type": "integer"},
+    "start_qa_salary": {"type": "integer"}
+}
+};
+
+pm.test("Schema is valid", () => {
+    pm.response.to.have.jsonSchema(schema);
+})
+
+=======================================================================================================
+
+//В ответе указаны коэффициенты умножения salary, напишите тесты по проверке правильности результата перемножения на коэффициент.
+
+let req = JSON.parse(request.data)
+let salary = parseInt(req.salary)
+
+pm.test("Check multiplier start_qa_salary", () => {
+    pm.expect(jsonData.start_qa_salary).to.eql(salary)});
+
+pm.test("Check multiplier qa_salary_after_6_months", () => {
+    pm.expect(jsonData.qa_salary_after_6_months).to.eql(salary * 2)});
+
+pm.test("Check multiplier qa_salary_after_12_months", () => {    
+    pm.expect(jsonData.qa_salary_after_12_months).to.eql(salary * 2.9)});
+
+pm.test("Check multiplier u_salary_1_5_year", () => {
+    pm.expect(jsonData.person.u_salary_1_5_year).to.eql(salary * 4)});
+
+=======================================================================================================
+
+//Достать значение из поля 'u_salary_1.5_year' и передать в поле salary запроса http://162.55.220.72:5005/get_test_user
+
+postman.setEnvironmentVariable("salary", jsonData.person.u_salary_1_5_year);
+
+=======================================================================================================
+
+//В ответе указаны коэффициенты умножения salary, напишите тесты по проверке правильности результата перемножения на коэффициент
+
+let req = request.data;
+let salary = parseInt(req.salary)
+
+pm.test("Check multiplier salary[0]", () => {
+    pm.expect(jsonData.salary[0]).to.eql(salary)});
+
+pm.test("Check multiplier salary[1]", () => {    
+    pm.expect(parseInt(jsonData.salary[1])).to.eql(salary * 2)});
+
+pm.test("Check multiplier salary[2]", () => {
+    pm.expect(parseInt(jsonData.salary[2])).to.eql(salary * 3)});
+
+=======================================================================================================
+
+//Проверить, что 2-й элемент массива salary больше 1-го и 0-го
+
+pm.test("Comparing array elements salary[2]>salary[1]", () => {
+    pm.expect(parseInt(jsonData.salary[2])).to.greaterThan(parseInt(jsonData.salary[1]))});
+
+pm.test("Comparing array elements salary[2]>salary[0]", () => {
+    pm.expect(parseInt(jsonData.salary[2])).to.greaterThan(jsonData.salary[0]);});
+
+=======================================================================================================
+
+//Проверить что значение поля name = значению переменной name из окружения
+let req = request.data;
+
+pm.test("Compare value name", () => {
+    pm.expect(jsonData.name).to.eql(req.name);
+});
+
+=======================================================================================================
+
+// 1 Можете взять любой объект из присланного списка, используйте js random.
+// В объекте возьмите Cur_ID и передать через окружение в следующий запрос.
+
+let min = 0;
+let max = jsonData.length //определяем длину массива
+curr_index = Math.floor(Math.random() * (max - min + 1)) + min;//получаем рандомное значение индекса массива
+curr_object = jsonData[curr_index];//получаем объект под данным индексом в массиве
+pm.environment.set("curr_code", curr_object.Cur_ID);//передаем значение Cur_ID в окружение
+
+=======================================================================================================
+
+/* ***
+1) получить список валют
+2) итерировать список валют
+3) в каждой итерации отправлять запрос на сервер для получения курса каждой валюты
+4) если возвращается 500 код, переходим к следующей итреации
+5) если получаем 200 код, проверяем response json на наличие поля "Cur_OfficialRate"
+6) если поле есть, пишем в консоль инфу про валюту в виде response
+7) переходим к следующей итерации
+*/
+
+let i = 0;
+while(i<jsonData.length){
+    let data = {
+        url: "http://162.55.220.72:5005/curr_byn",
+        method: "POST",
+        body: {
+          mode: 'formdata',
+          formdata: [
+            {key: "auth_token", value: pm.environment.get("token"), disabled: false, description: {content:"", type:"text/plain"}},
+            {key: "curr_code", value: jsonData[i].Cur_ID, disabled: false, description: {content:"", type:"text/plain"}}
+        ]}
+    };
+    pm.sendRequest(data, function (err, res) {
+        if(res.code == 200 && res.json().hasOwnProperty("Cur_OfficialRate")){
+            console.info(res.json());
+        }
+    });
+    i += 1;
+};
+
+=======================================================================================================
+
+
+
+
